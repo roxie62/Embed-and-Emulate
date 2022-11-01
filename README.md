@@ -1,5 +1,5 @@
 # Embed-and-Emulate
-This is the repo for the paper: Embed and Emulate: Learning to estimate parameters
+This is the repo for the paper, Embed and Emulate: Learning to estimate parameters
 of dynamical systems with uncertainty quantification.
 
 
