@@ -24,12 +24,12 @@ python -m torch.distributed.launch \
 --nproc_per_node=4 --master_port=${port} metricL.py\
  --train_size 500 \
  --batch_size_metricL 125 \
- --bank_size 0 \
- --mape_traj_pri 1 \
- --use_bn_embed \
+ --bank_size 1000 \
  --augpos_scale 0.04 \
  --augpos_prob 0.5 \
  --augpos_threshold 0.4 \
  --extra_prefix '' \
+ --use_bn_embed \
  --alter_tau \
+ --l96 \
  # --load_saved_metric \

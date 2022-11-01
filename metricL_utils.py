@@ -102,14 +102,13 @@ ACT = nn.ReLU
 class ParamEmbed(torch.nn.Module):
     def __init__(self, args, external_final_embed_layer = None):
         super().__init__()
-        base_dim = args.embed_dim
+        latent_dim = args.embed_dim
         first_proj_dim = args.hidden_dim_param
-        relu_dim = first_proj_dim  / 4 if not args.kse else first_proj_dim  / 3
+        relu_dim = first_proj_dim  / 4 if args.l96 else first_proj_dim  / 3
         norm_layer = nn.BatchNorm1d
         activation = nn.ReLU
         self.args = args
-        num_of_param = 4 if not args.kse else 3
-        latent_dim = num_of_param * base_dim
+        num_of_param = 4 if args.l96 else 3
         latent_width = args.hidden_dim_param
         if 'shallow' in self.args.extra_prefix.split('_'):
             print('using shallow network')
@@ -139,17 +138,15 @@ class MetricNet(torch.nn.Module):
         print('PAY attention, crop size is', T)
         self.args = args
         norm_layer = nn.BatchNorm2d
-        num_of_param = 4 if not args.kse else 3
-        base_dim = args.embed_dim
-        latent_dim = num_of_param * base_dim
+        num_of_param = 4 if args.l96 else 3
+        latent_dim = args.embed_dim
         first_dim = 11
-        self.use_mask = True
-        if not args.kse:
+        if args.l96:
             from resnet import resnet34
             self.encoder = resnet34(num_classes = num_of_param, first_dim = first_dim, norm_layer = norm_layer)
         else:
             from kse_resnet import resnet34
-            self.encoder = resnet34(num_classes = num_of_param, use_moment = use_moment, norm_layer = norm_layer)
+            self.encoder = resnet34(num_classes = num_of_param, norm_layer = norm_layer)
         dim_mlp = self.encoder.fc.weight.shape[1]
         activation = nn.ReLU
 
@@ -159,14 +156,12 @@ class MetricNet(torch.nn.Module):
             self.proj_head = nn.Sequential(nn.Linear(512, latent_dim))
 
         # create the queue
-        if not args.kse:
-            self.register_buffer("param_value_queue", torch.randn(4, args.train_size + args.bank_size))
+        if args.l96:
+            self.register_buffer("param_value_queue", torch.randn(4, args.bank_size))
         else:
-            self.register_buffer("param_value_queue", torch.randn(3, args.train_size + args.bank_size))
-        self.register_buffer("param_queue_embed", torch.randn(latent_dim, args.train_size + args.bank_size))
-        self.register_buffer("traj_queue_embed", torch.randn(latent_dim, args.train_size + args.bank_size))
-        if 'partial' in args.extra_prefix.split('_'):
-            self.register_buffer("masked_traj_queue_embed", torch.randn(latent_dim, args.train_size + args.bank_size))
+            self.register_buffer("param_value_queue", torch.randn(3, args.bank_size))
+        self.register_buffer("param_queue_embed", torch.randn(latent_dim, args.bank_size))
+        self.register_buffer("traj_queue_embed", torch.randn(latent_dim, args.bank_size))
         self.param_queue_embed = nn.functional.normalize(self.param_queue_embed, dim=0)
         self.traj_queue_embed = nn.functional.normalize(self.traj_queue_embed, dim=0)
         self.masked_traj_queue_embed = nn.functional.normalize(self.traj_queue_embed, dim=0)
