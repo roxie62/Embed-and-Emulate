@@ -30,3 +30,8 @@ Between the **inter-domains** of parameter and trajectory, we use CLIP-wise loss
 
 <img src="https://github.com/roxie62/Embed-and-Emulate/blob/main/plots/lorenz96_results.png" width="500" alt="drawing"/>
 
+## Acknowledgement
+
+Code for comparison methods:
+We would like to thank [Automatic Posterior Transformation for Likelihood-free Inference](http://proceedings.mlr.press/v97/greenberg19a/greenberg19a.pdf) for open-source code.
+We would like to thank [Neural Approximate Sufficient Statistics for Implicit Models]([http://proceedings.mlr.press/v97/greenberg19a/greenberg19a.pdf](https://arxiv.org/pdf/2010.10079.pdf)) for open-source code.
