@@ -12,3 +12,6 @@ We describe a novel framework for learning feature embeddings of observed dynami
 Leveraging a contrastive learning approach, our method (Embed & Emulate) exploits intrinsic data properties within and across parameter and trajectory domains. On a coupled 396-dimensional multiscale Lorenz 96 system, our method (Embed & Emulate) significantly outperforms a typical parameter estimation
 method based on predefined metrics and a classical numerical simulator, and with only 1.19\% of the baseline's computation time.
 Ablation studies highlight the potential of explicitly designing learned emulators for parameter estimation by leveraging contrastive learning.
+
+## Our method
+<img src="https://github.com/roxie62/Embed-and-Emulate/blob/master/plots/our_method.png" alt="drawing" width="500"/>
