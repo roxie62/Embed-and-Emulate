@@ -12,6 +12,10 @@ from train_utils import calculate_parameter_error, compute_moment_score
 from metricL_test import model_moment_func
 from metricL_utils import MetricNet
 from load_net import load_metric_net
+<<<<<<< HEAD
+=======
+# from multi_level_net import MultilevelNet
+>>>>>>> 7265f0f07cf1b46fafb4025a1a3c0e135ecb813c
 
 parser = argparse.ArgumentParser(description='End-to-End emulator')
 # parameters for the dataset Loernz 96
