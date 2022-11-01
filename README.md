@@ -17,7 +17,7 @@ Ablation studies highlight the potential of explicitly designing learned emulato
 
 <img src="https://github.com/roxie62/Embed-and-Emulate/blob/main/plots/our_method.png" width="500" alt="drawing"/>
 We propose our method, Embed and Emulate, to jointly learn feature embeddings and the emulator. 
-Unlike the standard setup, to fit well in our problem, we design our emulator to “emulate’’ the low-dimensional embeddings written in this composite form, instead of high-dimensional dynamics. And our goal is to find parameters that live close to the observations in the embedding space.
+Unlike the standard setup, which tries to approxiamte the high-dimensional dynamics and usually requires a pre-defined moment function to measure the closeness of the approximated dynamics to the truth value of the observations, to fit well in our problem, we design our emulator to “emulate’’ the low-dimensional embeddings written in this composite form, instead of high-dimensional dynamics. And our goal is to find parameters that live close to the observations in the embedding space.
 
 
 <img src="https://github.com/roxie62/Embed-and-Emulate/blob/main/plots/our_method_clip.png" width="500" alt="drawing"/>
