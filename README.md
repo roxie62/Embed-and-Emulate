@@ -13,5 +13,20 @@ Leveraging a contrastive learning approach, our method (Embed & Emulate) exploit
 method based on predefined metrics and a classical numerical simulator, and with only 1.19\% of the baseline's computation time.
 Ablation studies highlight the potential of explicitly designing learned emulators for parameter estimation by leveraging contrastive learning.
 
-## Our method
-<img src="https://github.com/roxie62/Embed-and-Emulate/blob/master/plots/our_method.png" alt="drawing" width="500"/>
+## Overview of our method
+
+<img src="https://github.com/roxie62/Embed-and-Emulate/blob/main/plots/our_method.png" width="500" alt="drawing"/>
+We propose our method, Embed and Emulate, to jointly learn feature embeddings and the emulator. 
+Unlike the standard setup, to fit well in our problem, we design our emulator to “emulate’’ the low-dimensional embeddings written in this composite form, instead of high-dimensional dynamics. And our goal is to find parameters that live close to the observations in the embedding space.
+
+
+<img src="https://github.com/roxie62/Embed-and-Emulate/blob/main/plots/our_method_clip.png" width="500" alt="drawing"/>
+
+We leverage contrastive learning to capture **intra-domain** structural information to learn meaningful embeddings.
+
+Between the **inter-domains** of parameter and trajectory, we use CLIP-wise loss to align the metric space of the “emulator” and the embedding network. As shown in the diagram, we define the embeddings of the parameter and its paired trajectory as “positive pairs”, and our goal is to maximize the similarity between “positive” pairs on the diagonal, while minimizing the unmatched “negative” pairs off the diagonal.
+
+## Experimental Results
+
+<img src="https://github.com/roxie62/Embed-and-Emulate/blob/main/plots/lorenz96_results.png" width="500" alt="drawing"/>
+
