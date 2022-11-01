@@ -1,18 +1,12 @@
 from configuration import *
-from dataloader import *
+from dataloader import TrainingData, random_cropping
 import torch.distributed as dist
-import torch.optim
-import torch.multiprocessing as mp
-import torch.utils.data
-import torch.utils.data.distributed
+import torch.optim, torch.utils.data
+import warnings, builtins
 from metricL_utils import MetricNet, ParamEmbed
-from metricL_utils_vit import MetricNet_ViT
-from mpdb import mpdb
 from utils import init_distributed_mode, HiddenPrints
 import time, math, copy
 from PIL import Image
-import warnings
-import builtins
 from metricL_eval_torch import create_eval_eki_with_metric_model
 from train_utils import calculate_parameter_loss
 
@@ -104,9 +98,8 @@ def main_worker(gpu, ngpus_per_node, args):
                                                                             train_epoch = train_epoch_ - 1)
 
     lr_ori = args.lr_ori
-    print('learning rate', lr_ori)
 
-    ## for synchorization
+    # synchorization of the batch normalization
     metric_model = nn.SyncBatchNorm.convert_sync_batchnorm(metric_model)
     param_model = nn.SyncBatchNorm.convert_sync_batchnorm(param_model)
 
@@ -139,7 +132,7 @@ def main_worker(gpu, ngpus_per_node, args):
     loss_list_param, loss_list_traj = [], []
     pri_hat_param_mape = []
     param_alone_loss_list, traj_alone_loss_list = [], []
-    idx_list, lr_list, metricL_list = [], [], []
+    lr_list, metricL_list = [], []
 
     img_folder = 'ResultsFolder/' + img_name
     if args.gpu == 0:
@@ -181,8 +174,6 @@ def main_worker(gpu, ngpus_per_node, args):
 
         for i, (anchor_param, anchor_t_crop, pos_param, pos_anchor_t_crop, idx, filter) in enumerate(train_loader):
             print('filter ratio', filter.sum()/anchor_param.shape[0])
-            if i == 0:
-                idx_list.append(idx.float().mean())
 
             anchor_param = anchor_param.cuda(args.gpu, non_blocking = True).float()
             anchor_t_crop = anchor_t_crop.cuda(args.gpu, non_blocking = True).float()
@@ -192,7 +183,6 @@ def main_worker(gpu, ngpus_per_node, args):
             cat_traj, cat_embed = metric_model.forward(torch.cat([anchor_t_crop[:, None, :, :], pos_anchor_t_crop[:, None, :, :]]), train = True, return_head_only = False)
             pri_hat_anchor_param_traj, pri_hat_pos_param_traj = cat_traj[:args.batch_size_metricL, :], cat_traj[args.batch_size_metricL:, :]
             anchor_embed, pos_anchor_embed = cat_embed[:args.batch_size_metricL, :], cat_embed[args.batch_size_metricL:, :]
-
             cat_param_embed = param_model(torch.cat([anchor_param, pos_param]))
             anchor_param_embed, pos_anchor_param_embed = cat_param_embed[:args.batch_size_metricL, :], cat_param_embed[args.batch_size_metricL:, :]
 
@@ -202,6 +192,7 @@ def main_worker(gpu, ngpus_per_node, args):
             param_embed_queue = metric_model.module.param_queue_embed.detach().clone()
             pos_anchor_param_embed_ = torch.cat([pos_anchor_param_embed, param_embed_queue.T], dim = 0)
 
+            # inter-domain CLIP-wise loss
             sim1 = anchor_embed @ anchor_param_embed.T /  T_metricL
             traj_head = torch.cat([sim1, anchor_embed @ param_embed_queue / T_metricL], dim = -1)
             param_head = torch.cat([sim1.T, anchor_param_embed @ traj_embed_queue / T_metricL], dim = -1)
@@ -210,24 +201,19 @@ def main_worker(gpu, ngpus_per_node, args):
             loss_traj = torch.nn.CrossEntropyLoss()(traj_head, labels)
             loss_param = torch.nn.CrossEntropyLoss()(param_head, labels)
 
+            # intra-domain contrastive loss
             labels = torch.arange(anchor_embed.shape[0], device = args.gpu)
             sim = (anchor_param_embed @ pos_anchor_param_embed_.T)
             loss_param_alone = torch.nn.CrossEntropyLoss()(sim / T_metricL_param_alone, labels)
             sim = anchor_embed @ pos_anchor_embed_.T
             loss_traj_alone = torch.nn.CrossEntropyLoss()(sim / T_metricL_traj_alone, labels)
-            sum_loss = args.loss_fix_param * (loss_traj + loss_param) + \
-                   args.loss_param_traj_alone * (args.loss_param_alone_coeff * loss_param_alone + args.loss_traj_alone_coeff * loss_traj_alone)
 
+            # regression head h_\theta
             pri_hat_param_loss_traj = calculate_parameter_loss(anchor_param, pri_hat_anchor_param_traj, dist_index = args.dist_index, weight_list = [1, 5, 1, 1])
 
-            sum_loss = sum_loss + args.mape_traj_pri * pri_hat_param_loss_traj
-
-            if args.gpu == 0 and train_epoch % 10 == 0:
-                print('contrastive embed loss', loss_param_alone, loss_traj_alone)
-                if 'partial' in args.extra_prefix.split('_'):
-                    print('masked traj alone loss', loss_masked_traj_alone)
-                print('fix loss', loss_traj + loss_param)
-                print('sum loss', sum_loss)
+            sum_loss = args.loss_fix_param * (loss_traj + loss_param) + \
+                       args.loss_param_traj_alone * (loss_param_alone + loss_traj_alone) + \
+                       args.mape_traj_pri * pri_hat_param_loss_traj
 
             metric_model.zero_grad()
             param_model.zero_grad()
@@ -239,16 +225,24 @@ def main_worker(gpu, ngpus_per_node, args):
             pri_hat_param_mape.append(pri_hat_param_loss_traj.item())
             traj_alone_loss_list.append(loss_traj_alone.item())
             with torch.no_grad():
-                metric_model.module._dequeue_and_enqueue_masked(anchor_param, anchor_param_embed, anchor_embed, masked_anchor_embed)
+                metric_model.module._dequeue_and_enqueue(anchor_param, anchor_param_embed, anchor_embed)
             plt.plot(np.arange(len(lr_list)), np.array(lr_list))
             plt.savefig('{}/lr.png'.format(img_folder))
             plt.close()
 
 
         if train_epoch % 20 == 0:
+            # print out loss values
+            print('contrastive embed loss', loss_param_alone, loss_traj_alone)
+            print('fix loss', loss_traj + loss_param)
+            print('sum loss', sum_loss)
+
+            # draw the \tau values
             plt.plot(np.arange(len(metricL_list)), np.array(metricL_list))
             plt.savefig('{}/metricL.png'.format(img_folder))
             plt.close()
+
+            # visualize the losses
             fig, ax = plt.subplots()
             fig.subplots_adjust(right=0.75)
             twin1 = ax.twinx()
@@ -265,10 +259,7 @@ def main_worker(gpu, ngpus_per_node, args):
             plt.savefig('{}/loss.png'.format(img_folder))
             plt.close()
 
-            plt.plot(np.arange(len(idx_list)), np.array(idx_list))
-            plt.savefig('{}/idx_list.png'.format(img_folder))
-            plt.close()
-
+            # visualize the mape loss
             plt.plot(np.arange(np.array(pri_hat_param_mape).shape[0]), np.array(pri_hat_param_mape), label = 'traj')
             plt.legend()
             plt.grid(True)

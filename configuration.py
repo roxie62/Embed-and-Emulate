@@ -9,7 +9,6 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 from utils import AverageMeter, ProgressMeter,
 from train_utils import calculate_parameter_error, compute_moment_score
-from metricL_test import model_moment_func
 from metricL_utils import MetricNet
 from load_net import load_metric_net
 <<<<<<< HEAD
@@ -36,7 +35,6 @@ parser.add_argument('--use_bn_embed', action = 'store_true')
 parser.add_argument('--use_adamw', action = 'store_true')
 parser.add_argument('--seed', default = 1, type = int)
 parser.add_argument('--gpu', default = 0, type = int)
-parser.add_argument('--T', default = 100, type = int)
 
 parser.add_argument('--total_epochs', default = 1000, type = int)
 parser.add_argument('--train_size', default = 10000, type = int)
@@ -48,13 +46,11 @@ parser.add_argument('--dt', default = 0.1, type = float)
 # for optimizer
 parser.add_argument('--weight_decay', default = 1e-4, type = float)
 parser.add_argument('--lr_ori', default = 1e-2, type = float)
-parser.add_argument('--lr', default = 0.0001, type = float)
 
 # Loss weights
 parser.add_argument('--mape_traj_pri', default = 1, type = float)
 parser.add_argument('--loss_param_traj_alone', default = 0.5, type = float)
-parser.add_argument('--loss_param_alone_coeff', default = 1, type = float)
-parser.add_argument('--loss_traj_alone_coeff', default = 1, type = float)
+
 # temperature value for contrastive and clip losses
 parser.add_argument('--T_metricL', default = 0.15, type = float)
 parser.add_argument('--T_metricL_param_alone', default = 0.15, type = float)

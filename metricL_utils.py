@@ -100,6 +100,9 @@ class skip_embed(torch.nn.Module):
 ACT = nn.ReLU
 
 class ParamEmbed(torch.nn.Module):
+    """
+    "Emulator": \hat{g}_\theta.
+    """
     def __init__(self, args, external_final_embed_layer = None):
         super().__init__()
         latent_dim = args.embed_dim
@@ -129,7 +132,7 @@ class ParamEmbed(torch.nn.Module):
 
 class MetricNet(torch.nn.Module):
     """
-    Network module for a single level.
+    Embedding network: f_\theta.
     """
 
     def __init__(self, T, args, use_moment = False, use_bn = True, use_sn = False):
@@ -183,29 +186,7 @@ class MetricNet(torch.nn.Module):
         self.traj_queue_embed[:, ptr:ptr + batch_size] = traj_embed_keys.T
         ptr = (ptr + batch_size) % K  # move pointer
 
-
         self.queue_ptr[0] = ptr
-
-    @torch.no_grad()
-    def _dequeue_and_enqueue_masked(self, param_value_keys, param_embed_keys, traj_embed_keys, masked_traj_embed_keys):
-        # gather keys before updating queue
-        param_value_keys = concat_all_gather(param_value_keys)
-        param_embed_keys = concat_all_gather(param_embed_keys)
-        traj_embed_keys = concat_all_gather(traj_embed_keys)
-        masked_traj_embed_keys = concat_all_gather(masked_traj_embed_keys)
-
-        batch_size = traj_embed_keys.shape[0]
-        K = self.param_queue_embed.shape[1]
-        ptr = int(self.queue_ptr)
-        assert K % batch_size == 0  # for simplicity
-        self.param_value_queue[:, ptr:ptr + batch_size] = param_value_keys.T
-        self.param_queue_embed[:, ptr:ptr + batch_size] = param_embed_keys.T
-        self.traj_queue_embed[:, ptr:ptr + batch_size] = traj_embed_keys.T
-        self.masked_traj_queue_embed[:, ptr:ptr + batch_size] = masked_traj_embed_keys.T
-        ptr = (ptr + batch_size) % K  # move pointer
-
-        self.queue_ptr[0] = ptr
-
 
     def crop_for_test(self, traj):
         T = traj.shape[1]
@@ -220,16 +201,15 @@ class MetricNet(torch.nn.Module):
         return test_crop
 
     def forward(self, traj, mask = 0, train = False, return_params_only = False, return_head_only = True):
-        # c: number of crops
-        # s: crop T
-        # h: dim of l96 (396)
-
         if not train:
             crop = self.crop_for_test(traj)
         else:
             crop = traj
         n,c, s,h = crop.shape
-        if not self.args.kse:
+        if args.l96:
+            # c: number of crops
+            # s: crop T
+            # h: dim of l96 (396)
             crop_x = crop[...,:36].reshape(n * c, s, 36, 1)
             crop_y = crop[...,36:].reshape(n * c, s, 36, 10)
             crop = torch.cat([crop_x, crop_y], dim = -1).permute(0,3,2,1)
