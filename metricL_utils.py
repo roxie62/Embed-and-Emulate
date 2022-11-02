@@ -8,15 +8,9 @@ from mpdb import mpdb
 import torch.nn.utils.spectral_norm as spectral_norm
 import math
 
-def exists(val):
-    return val is not None
-
-def cast_tuple(val, repeat = 1):
-    return val if isinstance(val, tuple) else ((val,) * repeat)
-
 
 class skip_embed_final(torch.nn.Module):
-    def __init__(self, input_dim, latent_dim, output_dim, norm_layer, args):
+    def __init__(self, input_dim, latent_dim, output_dim, norm_layer):
         super().__init__()
         self.embed = nn.Sequential(
                                nn.Linear(input_dim, latent_dim),
@@ -34,7 +28,7 @@ class skip_embed_final(torch.nn.Module):
 
 # 512-512-64 finalbn
 class skip_embed_final_shallow(torch.nn.Module):
-    def __init__(self, input_dim, latent_dim, output_dim, norm_layer, args):
+    def __init__(self, input_dim, latent_dim, output_dim, norm_layer):
         super().__init__()
         self.embed = nn.Sequential(
                                nn.Linear(input_dim, output_dim),
@@ -46,44 +40,26 @@ class skip_embed_final_shallow(torch.nn.Module):
     def forward(self, input):
         return self.embed(input) + self.skip(input)
 
-
-class skip_embed_start_kse(torch.nn.Module):
-    ## this block is applied only when input_dim is lower than output_dim.
-    def __init__(self, relu_dim, norm_layer, args):
-        super().__init__()
-        self.param_proj = nn.Sequential(*[nn.Linear(1, relu_dim) for i in range(3)])
-        self.embed = nn.Sequential(
-                               norm_layer(3 * relu_dim),
-                               ACT(inplace = True),
-                               )
-        self.skip_param_proj = nn.Sequential(*[nn.Linear(1, relu_dim) for i in range(3)])
-
-    def forward(self, input):
-        embed_feat = self.embed(torch.cat([self.param_proj[i](input[:,i]) for i in range(3)], dim = -1))
-        skip_feat = torch.cat([self.skip_param_proj[i](input[:,i]) for i in range(3)], dim = -1)
-        out = embed_feat + skip_feat
-        out = self.ACT_embed(out)
-        return embed_feat + skip_feat
-
 class skip_embed_start(torch.nn.Module):
     ## this block is applied only when input_dim is lower than output_dim.
-    def __init__(self, relu_dim, norm_layer, args):
+    def __init__(self, relu_dim, norm_layer, num_of_param):
         super().__init__()
-        self.param_proj = nn.Sequential(*[nn.Linear(1, relu_dim) for i in range(4)])
+        self.num_of_param = num_of_param
+        self.param_proj = nn.Sequential(*[nn.Linear(1, relu_dim) for i in range(num_of_param)])
         self.embed = nn.Sequential(
-                               norm_layer(4 * relu_dim),
+                               norm_layer(num_of_param * relu_dim),
                                ACT(inplace = True),
                                )
-        self.skip_param_proj = nn.Sequential(*[nn.Linear(1, relu_dim) for i in range(4)])
+        self.skip_param_proj = nn.Sequential(*[nn.Linear(1, relu_dim) for i in range(num_of_param)])
 
     def forward(self, input):
-        embed_feat = self.embed(torch.cat([self.param_proj[i](input[:,i]) for i in range(4)], dim = -1))
-        skip_feat = torch.cat([self.skip_param_proj[i](input[:,i]) for i in range(4)], dim = -1)
+        embed_feat = self.embed(torch.cat([self.param_proj[i](input[:,i]) for i in range(self.num_of_param)], dim = -1))
+        skip_feat = torch.cat([self.skip_param_proj[i](input[:,i]) for i in range(self.num_of_param)], dim = -1)
         out = embed_feat + skip_feat
         return out
 
 class skip_embed(torch.nn.Module):
-    def __init__(self, input_dim, latent_dim, output_dim, norm_layer, args):
+    def __init__(self, input_dim, latent_dim, output_dim, norm_layer):
         super().__init__()
         self.embed = nn.Sequential(
                                nn.Linear(input_dim, latent_dim),
@@ -113,17 +89,15 @@ class ParamEmbed(torch.nn.Module):
         self.args = args
         num_of_param = 4 if args.l96 else 3
         latent_width = args.hidden_dim_param
-        if 'shallow' in self.args.extra_prefix.split('_'):
-            print('using shallow network')
-            self.embed = nn.Sequential(
-                            skip_embed_start(int(relu_dim), norm_layer, args),
-                            skip_embed(latent_width, latent_width, latent_width, norm_layer, args),
-                            skip_embed(latent_width, latent_width, latent_width, norm_layer, args),
-                            skip_embed(latent_width, latent_width, latent_width, norm_layer, args),
-                            skip_embed(latent_width, latent_width, latent_width, norm_layer, args),
-                            skip_embed(latent_width, latent_width, latent_width, norm_layer, args),
-                            skip_embed_final_shallow(latent_width, latent_width, latent_dim, norm_layer, args),
-                            )
+        self.embed = nn.Sequential(
+                        skip_embed_start(int(relu_dim), norm_layer, num_of_param),
+                        skip_embed(latent_width, latent_width, latent_width, norm_layer),
+                        skip_embed(latent_width, latent_width, latent_width, norm_layer),
+                        skip_embed(latent_width, latent_width, latent_width, norm_layer),
+                        skip_embed(latent_width, latent_width, latent_width, norm_layer),
+                        skip_embed(latent_width, latent_width, latent_width, norm_layer),
+                        skip_embed_final_shallow(latent_width, latent_width, latent_dim, norm_layer),
+                        )
 
     def forward(self, param, return_head_only = True):
         embed = self.embed(param[:, :, None])
@@ -154,7 +128,7 @@ class MetricNet(torch.nn.Module):
         activation = nn.ReLU
 
         if args.use_bn_embed:
-            self.proj_head = skip_embed_final(512, 512, latent_dim, nn.BatchNorm1d, args)
+            self.proj_head = skip_embed_final(512, 512, latent_dim, nn.BatchNorm1d)
         else:
             self.proj_head = nn.Sequential(nn.Linear(512, latent_dim))
 

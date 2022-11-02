@@ -103,10 +103,6 @@ def main_worker(gpu, ngpus_per_node, args):
     metric_model = nn.SyncBatchNorm.convert_sync_batchnorm(metric_model)
     param_model = nn.SyncBatchNorm.convert_sync_batchnorm(param_model)
 
-    ## Parameters
-    K, J = args.K, args.J
-    crop_T = args.crop_T
-
     batch_size = args.batch_size_metricL
     train_dataset = TrainingData(args.crop_T, args, train_size = args.train_size)
 
