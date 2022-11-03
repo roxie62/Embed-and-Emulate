@@ -11,8 +11,6 @@ We assume access to a computationally complex simulator that inputs a candidate 
 Standard iterative approaches necessitate running the simulator many times, which is computationally prohibitive.
 We describe a novel framework for learning feature embeddings of observed dynamics jointly with an emulator that can replace high-cost simulators for parameter estimation. Leveraging a contrastive learning approach, our method exploits intrinsic data properties within and across parameter and trajectory domains. 
 
-On a coupled 396-dimensional multiscale Lorenz 96 system, our method significantly outperforms a typical parameter estimation method based on predefined metrics and a classical numerical simulator, and with only 1.19\% of the baseline's computation time.
-
 ## Overview of our method
 
 <img src="https://github.com/roxie62/Embed-and-Emulate/blob/main/plots/our_method.png" width="500" alt="drawing"/>
